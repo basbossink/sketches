@@ -25,6 +25,7 @@ enum TRAIN_STATE {
   ALL_BLINKING,
   EVEN_BLINKING,
   ODD_BLINKING,
+  KNIGHT_RIDER
 }; 
 
 struct led {
@@ -50,12 +51,15 @@ void loopRunningBackwardState();
 void loopAllBlinkingState();
 void loopEvenBlinkingState();
 void loopOddBlinkingState();
+void loopKnightRiderState();
 void switchOffAll();
+void switchOffAllAndResetCurrentOnLedIndex();
+void resetCurrentOnLedIndex();
 
-const int numberOfStates = 10;
+const int numberOfStates = 11;
 const struct state STATES[] = {
   { OFF, RUNNING, &switchOffAll, &nop },
-  { RUNNING, STOPPING, 0, &loopRunningState },
+  { RUNNING, STOPPING, &resetCurrentOnLedIndex, &loopRunningState },
   { STOPPING, STOPPED_BEFORE_BACKWARDS, 0, &loopStoppingState },
   { STOPPED_BEFORE_BACKWARDS, BACKWARDS, 0, &nop },
   { BACKWARDS, BACKWARDS_STOPPING, 0, &loopRunningBackwardState },
@@ -63,8 +67,104 @@ const struct state STATES[] = {
   { STOPPED, ALL_BLINKING, 0, &nop },
   { ALL_BLINKING, EVEN_BLINKING, &switchOffAll, &loopAllBlinkingState },
   { EVEN_BLINKING, ODD_BLINKING, &switchOffAll, &loopEvenBlinkingState },
-  { ODD_BLINKING, OFF, &switchOffAll, &loopOddBlinkingState }
+  { ODD_BLINKING, KNIGHT_RIDER, &switchOffAll, &loopOddBlinkingState },
+  { KNIGHT_RIDER, OFF, &switchOffAll, &loopKnightRiderState }
 };
+
+void myAnalogWrite(uint8_t pin, uint8_t value);
+const int ANALOG_HIGH_VALUE = 255;
+#define ANALOG(pin) pin, ANALOG_HIGH_VALUE, 0, &myAnalogWrite
+#define DIGITAL(pin) pin, HIGH, 0, &digitalWrite
+
+const int NUMBER_OF_LEDS = 8;
+struct led LEDS[] = {
+  { ANALOG(6) },
+  { DIGITAL(7) },
+  { DIGITAL(8) },
+  { ANALOG(9) },
+  { ANALOG(10) },
+  { ANALOG(11) },
+  { DIGITAL(12) },
+  { DIGITAL(13) }
+};
+
+void switchOff(struct led *l) {
+  l->write(l->pin, 0);
+  l->isOn = 0;
+}
+
+void switchOn(struct led *l) {
+  l->write(l->pin, l->highValue);
+  l->isOn = 1;
+}
+
+void toggleLed(struct led* l) {
+  if(l->isOn) {
+    switchOff(l);
+  } else {
+    switchOn(l); 
+  }
+}
+
+void forEachLed(void(*fn)(struct led*)) {
+  for(int i = 0; i < NUMBER_OF_LEDS; i++) {
+    fn(LEDS+i);
+  }
+}
+
+void switchOffAll() {
+  forEachLed(&switchOff);
+}
+
+const int BUTTON_PIN = 2;
+const long BLINK_INTERVAL = 300;
+int currentOnLedIndex = 0;
+struct state currentTrainState = STATES[0];
+
+void incrementCurrentLedIndex() {
+  currentOnLedIndex++;
+  if(currentOnLedIndex == NUMBER_OF_LEDS) {
+    currentOnLedIndex = 0;
+  }
+}
+
+void decrementCurrentLedIndex() {
+  currentOnLedIndex--;
+  if(currentOnLedIndex == -1) {
+    currentOnLedIndex = NUMBER_OF_LEDS - 1;
+  }
+}
+
+void switchOnNextLed() {
+  switchOff(LEDS + currentOnLedIndex);
+  incrementCurrentLedIndex();
+  switchOn(LEDS + currentOnLedIndex);
+}
+
+void switchOnPreviousLed() {
+  switchOff(LEDS + currentOnLedIndex);
+  decrementCurrentLedIndex();
+  switchOn(LEDS + currentOnLedIndex);
+}
+
+void resetCurrentOnLedIndex() {
+  currentOnLedIndex = NUMBER_OF_LEDS - 1;
+}
+
+void switchOffAllAndResetCurrentOnLedIndex() {
+  switchOffAll();
+  resetCurrentOnLedIndex();
+}
+
+int interValElapsed(int interval) {
+  unsigned long currentMillis = millis();
+  static unsigned long previousMillis = currentMillis;
+  int returnValue = currentMillis - previousMillis > interval;
+  if (returnValue) {
+    previousMillis = currentMillis;
+  }
+  return returnValue;
+}
 
 struct state nextState(struct state currentState) {
   for(int i = 0; i < numberOfStates; i++) {
@@ -82,128 +182,31 @@ struct state nextState(struct state currentState) {
   }
 }
 
-void myAnalogWrite(uint8_t pin, uint8_t value) {
-  analogWrite(pin,value);
-}
-
-#define ANALOG(pin) pin, analogHighValue, 0, &myAnalogWrite
-#define DIGITAL(pin) pin, HIGH, 0, &digitalWrite
-
-const int analogHighValue = 255;
-const int numberOfLeds = 8;
-struct led LEDS[] = {
-  { ANALOG(6) },
-  { DIGITAL(7) },
-  { DIGITAL(8) },
-  { ANALOG(9) },
-  { ANALOG(10) },
-  { ANALOG(11) },
-  { DIGITAL(12) },
-  { DIGITAL(13) }
-};
-
-
-void switchOff(struct led *l) {
-  l->write(l->pin, 0);
-  l->isOn = 0;
-}
-
-void switchOn(struct led *l) {
-  l->write(l->pin, l->highValue);
-  l->isOn = 1;
-}
-
-void forEachLed(void(*fn)(struct led*)) {
-  for(int i = 0; i < numberOfLeds; i++) {
-    fn(LEDS+i);
-  }
-}
-
-void switchOffAll() {
-  forEachLed(&switchOff);
-}
-
-const int buttonPin = 2;
-const long blinkInterval = 300;
-const long decelerationMultiplier = 3;
-const int numberOfStoppingBlinks = 6;
-unsigned long previousMillis = 0;
-unsigned long currentMillis = 0;
-int buttonPushCounter = 0;
-int buttonState = 0;
-int lastButtonState = 0;
-int currentOnLedIndex = 0;
-struct state currentTrainState = STATES[0];
-int stoppingBlinksElapsed = 0;
-
-void incrementCurrentLedIndex() {
-    currentOnLedIndex++;
-    if(currentOnLedIndex == numberOfLeds) {
-      currentOnLedIndex = 0;
-    }
-}
-
-void decrementCurrentLedIndex() {
-    currentOnLedIndex--;
-    if(currentOnLedIndex == -1) {
-      currentOnLedIndex = numberOfLeds - 1;
-    }
-}
-
-void switchOnNextLed() {
-    switchOff(LEDS + currentOnLedIndex);
-    incrementCurrentLedIndex();
-    switchOn(LEDS + currentOnLedIndex);
-}
-
-void switchOnPreviousLed() {
-    switchOff(LEDS + currentOnLedIndex);
-    decrementCurrentLedIndex();
-    switchOn(LEDS + currentOnLedIndex);
-}
-
-int interValElapsed(int interval) {
-  currentMillis = millis();
-  int returnValue = currentMillis - previousMillis > interval;
-  if (returnValue) {
-    previousMillis = currentMillis;
-  }
-  return returnValue;
-}
-
-void loopRunningInADirectionState(void(*swithToNextLight)()) {
-  if(interValElapsed(blinkInterval)) {
-    swithToNextLight();
+void loopRunningInADirectionState(void(*switchOnNextLed)()) {
+  if(interValElapsed(BLINK_INTERVAL)) {
+    switchOnNextLed();
   }
 }
 
 void nop() {}
 
-void toggleLed(struct led* l) {
-  if(l->isOn) {
-    switchOff(l);
-  } else {
-    switchOn(l); 
-  }
-}
-
 void loopAllBlinkingState() {
-  if(interValElapsed(blinkInterval)) {
+  if(interValElapsed(BLINK_INTERVAL)) {
     forEachLed(&toggleLed);
   }  
-}
-
-int isOdd(int integer) {
-  return integer % 2 == 1;
 }
 
 int isEven(int integer) {
   return integer % 2 == 0;
 }
 
+int isOdd(int integer) {
+  return !isEven(integer);
+}
+
 void loopBlinkingState(int(*predicate)(int)) {
-  if(interValElapsed(blinkInterval)) {
-     for(int i = 0; i < numberOfLeds; i++) {
+  if(interValElapsed(BLINK_INTERVAL)) {
+     for(int i = 0; i < NUMBER_OF_LEDS; i++) {
        if(predicate(i)) {
          toggleLed(LEDS + i);
        } else {
@@ -230,10 +233,12 @@ void loopRunningBackwardState() {
 }
 
 void loopStoppingInADirectionState(void(*switchToNextLight)()) {
-  if(interValElapsed(blinkInterval + (stoppingBlinksElapsed * blinkInterval))) {
+  const int NUMBER_OF_STOPPING_BLINKS = 6;
+  static int stoppingBlinksElapsed = 0;
+  if(interValElapsed(BLINK_INTERVAL + (stoppingBlinksElapsed * BLINK_INTERVAL))) {
     stoppingBlinksElapsed++;
     switchToNextLight();
-    if (stoppingBlinksElapsed >= numberOfStoppingBlinks) {
+    if (stoppingBlinksElapsed >= NUMBER_OF_STOPPING_BLINKS) {
       stoppingBlinksElapsed = 0;
       currentTrainState = nextState(currentTrainState);
     }
@@ -241,11 +246,29 @@ void loopStoppingInADirectionState(void(*switchToNextLight)()) {
 }
 
 void loopStoppingState() {
-    loopStoppingInADirectionState(&switchOnNextLed);
+  loopStoppingInADirectionState(&switchOnNextLed);
 }
 
 void loopStoppingBackwardState() {
-    loopStoppingInADirectionState(&switchOnPreviousLed);
+  loopStoppingInADirectionState(&switchOnPreviousLed);
+}
+
+enum DIRECTION { UP, DOWN };
+enum DIRECTION direction = UP;
+void loopKnightRiderState() {
+  if(interValElapsed(BLINK_INTERVAL)) {
+    if(currentOnLedIndex == 0) {
+      direction = UP;
+    } 
+    if(currentOnLedIndex == NUMBER_OF_LEDS -1) {
+      direction = DOWN;
+    }
+    if(direction == UP) {
+      switchOnNextLed();
+    } else {
+      switchOnPreviousLed();
+    }
+  }
 }
 
 void setPinModeToOutput(struct led* l) {
@@ -254,17 +277,18 @@ void setPinModeToOutput(struct led* l) {
 
 void setup() {
   Serial.begin(9600);
-  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   forEachLed(&setPinModeToOutput);
   switchOffAll();
 } 
 
+int lastButtonState = 0;
+
 void loop() {
-  buttonState = digitalRead(buttonPin);
+  int buttonState = digitalRead(BUTTON_PIN);
   if(buttonState != lastButtonState) {
     if(buttonState == HIGH) {
       Serial.println("Button pushed, button state HIGH");
-      buttonPushCounter++;
       currentTrainState = nextState(currentTrainState);
       if(currentTrainState.onEnterState) {
         currentTrainState.onEnterState();
@@ -273,4 +297,8 @@ void loop() {
   }
   lastButtonState = buttonState;
   currentTrainState.loopFunction();
+}
+
+void myAnalogWrite(uint8_t pin, uint8_t value) {
+  analogWrite(pin,value);
 }
