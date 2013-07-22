@@ -2,6 +2,8 @@ enum TRAIN_STATE {
   OFF,
   KNIGHT_RIDER,
   CYLON_COMMANDER,
+  FILLING_UP,
+  FILLING_UP_DRYING_UP,
   RUNNING,
   HIGH_SPEED,
   ULTRA_HIGH_SPEED,
@@ -47,11 +49,15 @@ void loopUltraHighSpeedRunningState();
 void loopKnightRiderState();
 void loopCylonCommanderState();
 void switchOffAllAndResetLedIndex();
+void loopFillingUp();
+void loopFillingUpDryingUp();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
   { KNIGHT_RIDER, CYLON_COMMANDER, &switchOffAllAndResetLedIndex, &loopKnightRiderState },
-  { CYLON_COMMANDER, RUNNING, &switchOffAllAndResetLedIndex, &loopCylonCommanderState },
+  { CYLON_COMMANDER, FILLING_UP, &switchOffAllAndResetLedIndex, &loopCylonCommanderState },
+  { FILLING_UP, FILLING_UP_DRYING_UP, &switchOffAllAndResetLedIndex, &loopFillingUp },
+  { FILLING_UP_DRYING_UP, RUNNING, &switchOffAllAndResetLedIndex, &loopFillingUpDryingUp },
   { RUNNING, HIGH_SPEED, 0, &loopRunningState },
   { HIGH_SPEED, ULTRA_HIGH_SPEED, 0, &loopHighSpeedRunningState },
   { ULTRA_HIGH_SPEED, STOPPING, 0, &loopUltraHighSpeedRunningState },
@@ -108,6 +114,7 @@ const unsigned long ULTRA_HIGH_SPEED_BLINK_INTERVAL = BLINK_INTERVAL >> 4;
 enum DIRECTION cylonLeftDirection = RIGHT_TO_LEFT;
 enum DIRECTION cylonRightDirection = LEFT_TO_RIGHT;
 enum DIRECTION knightRiderDirection = LEFT_TO_RIGHT;
+enum DIRECTION fillingDirection = LEFT_TO_RIGHT;
 int buttonPushCounter = 0;
 int buttonState = 0;
 int currentOnLedIndex = 0;
@@ -361,6 +368,45 @@ void loopCylonCommanderState() {
   if(interValElapsed(CYLON_BLINK_INTERVAL)) {
     advanceLeftLed();
     advanceRightLed();
+  }
+}
+
+void addLed() {
+  switchOn(LEDS + currentOnLedIndex);
+}
+
+void loopFillingUp() {
+  if(interValElapsed(HIGH_SPEED_BLINK_INTERVAL)) {
+    addLed();
+    if(currentOnLedIndex == NUMBER_OF_LEDS) {
+      switchOffAllAndResetLedIndex();
+    } else {
+      currentOnLedIndex++;
+    }
+  }
+}
+
+void removeLed() {
+  switchOff(LEDS + currentOnLedIndex);
+}
+
+void loopFillingUpDryingUp() {
+  if(currentOnLedIndex == NUMBER_OF_LEDS) {
+    fillingDirection = RIGHT_TO_LEFT;
+  } 
+  if(currentOnLedIndex == -1) {
+    fillingDirection = LEFT_TO_RIGHT;
+    currentOnLedIndex++;
+  } 
+  if(interValElapsed(CYLON_BLINK_INTERVAL)) {
+    if(fillingDirection == LEFT_TO_RIGHT) {
+      addLed();
+      currentOnLedIndex++;
+    }
+    if(fillingDirection == RIGHT_TO_LEFT) {
+      removeLed();
+      currentOnLedIndex--;
+    }
   }
 }
 
