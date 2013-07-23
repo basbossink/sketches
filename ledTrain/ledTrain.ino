@@ -4,6 +4,7 @@ enum TRAIN_STATE {
   CYLON_COMMANDER,
   FILLING_UP,
   FILLING_UP_DRYING_UP,
+  RANDOM_FILL,
   RUNNING,
   HIGH_SPEED,
   ULTRA_HIGH_SPEED,
@@ -51,14 +52,16 @@ void loopCylonCommanderState();
 void switchOffAllAndResetLedIndex();
 void loopFillingUp();
 void loopFillingUpDryingUp();
+void loopRandomFill();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
   { KNIGHT_RIDER, CYLON_COMMANDER, &switchOffAllAndResetLedIndex, &loopKnightRiderState },
   { CYLON_COMMANDER, FILLING_UP, &switchOffAllAndResetLedIndex, &loopCylonCommanderState },
   { FILLING_UP, FILLING_UP_DRYING_UP, &switchOffAllAndResetLedIndex, &loopFillingUp },
-  { FILLING_UP_DRYING_UP, RUNNING, &switchOffAllAndResetLedIndex, &loopFillingUpDryingUp },
-  { RUNNING, HIGH_SPEED, 0, &loopRunningState },
+  { FILLING_UP_DRYING_UP, RANDOM_FILL, &switchOffAllAndResetLedIndex, &loopFillingUpDryingUp },
+  { RANDOM_FILL, RUNNING, &switchOffAllAndResetLedIndex, &loopRandomFill },
+  { RUNNING, HIGH_SPEED, &switchOffAllAndResetLedIndex, &loopRunningState },
   { HIGH_SPEED, ULTRA_HIGH_SPEED, 0, &loopHighSpeedRunningState },
   { ULTRA_HIGH_SPEED, STOPPING, 0, &loopUltraHighSpeedRunningState },
   { STOPPING, STOPPED_BEFORE_BACKWARDS, 0, &loopStoppingState },
@@ -115,6 +118,7 @@ enum DIRECTION cylonLeftDirection = RIGHT_TO_LEFT;
 enum DIRECTION cylonRightDirection = LEFT_TO_RIGHT;
 enum DIRECTION knightRiderDirection = LEFT_TO_RIGHT;
 enum DIRECTION fillingDirection = LEFT_TO_RIGHT;
+
 int buttonPushCounter = 0;
 int buttonState = 0;
 int currentOnLedIndex = 0;
@@ -122,6 +126,8 @@ int cylonLeftIndex = 0;
 int cylonRightIndex = 0;
 int lastButtonState = 0;
 int stoppingBlinksElapsed = 0;
+int targetIndex = 0;
+
 struct state currentTrainState = STATES[0];
 unsigned long currentMillis = 0;
 unsigned long lastDebounceTime = 0;
@@ -410,6 +416,36 @@ void loopFillingUpDryingUp() {
   }
 }
 
+void loopRandomFill() {
+  if(currentOnLedIndex > targetIndex) {
+    fillingDirection = RIGHT_TO_LEFT;
+  } 
+  if(currentOnLedIndex < targetIndex) {
+    fillingDirection = LEFT_TO_RIGHT;
+  } 
+  if(currentOnLedIndex == targetIndex) {
+    if(fillingDirection == LEFT_TO_RIGHT) {
+      switchOn(LEDS + targetIndex);
+    }
+    if(fillingDirection == RIGHT_TO_LEFT) {
+      switchOff(LEDS + targetIndex);
+    }
+    targetIndex = random(NUMBER_OF_LEDS);
+  }
+  if(interValElapsed(HIGH_SPEED_BLINK_INTERVAL)) {
+    if(fillingDirection == LEFT_TO_RIGHT) {
+      addLed();
+      currentOnLedIndex++;
+      currentOnLedIndex = min(currentOnLedIndex, NUMBER_OF_LEDS -1);
+    }
+    if(fillingDirection == RIGHT_TO_LEFT) {
+      removeLed();
+      currentOnLedIndex--;
+      currentOnLedIndex = max(0,currentOnLedIndex);
+    }
+  }
+}
+
 struct state nextState(struct state currentState) {
   for(int i = 0; i < NUMBER_STATES; i++) {
     if(currentState.state == STATES[i].state) {
@@ -433,6 +469,7 @@ void setPinModeToOutput(struct led* l) {
 void setup() {
   Serial.begin(9600);
   pinMode(BUTTON_PIN, INPUT);
+  randomSeed(analogRead(0));
   forEachLed(&setPinModeToOutput);
   switchOffAll();
 } 
