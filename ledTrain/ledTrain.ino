@@ -14,6 +14,7 @@ enum TRAIN_STATE {
   BACKWARDS,
   BACKWARDS_STOPPING,
   STOPPED,
+  RUNNING_TRAIN,
   ALL_BLINKING,
   EVEN_BLINKING,
   ODD_BLINKING,
@@ -56,6 +57,7 @@ void loopFillingUpDryingUp();
 void loopRandomFill();
 void loopCrossingLeds();
 void switchOffAllAndResetCylonIndices();
+void loopRunningTrain();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -72,7 +74,8 @@ const struct state STATES[] = {
   { STOPPED_BEFORE_BACKWARDS, BACKWARDS, 0, &nop },
   { BACKWARDS, BACKWARDS_STOPPING, 0, &loopRunningBackwardState },
   { BACKWARDS_STOPPING, STOPPED,  0, &loopStoppingBackwardState },
-  { STOPPED, ALL_BLINKING, 0, &nop },
+  { STOPPED, RUNNING_TRAIN, 0, &nop },
+  { RUNNING_TRAIN, ALL_BLINKING, &switchOffAllAndResetLedIndex, &loopRunningTrain },
   { ALL_BLINKING, EVEN_BLINKING, &switchOffAll, &loopAllBlinkingState },
   { EVEN_BLINKING, ODD_BLINKING, &switchOffAll, &loopEvenBlinkingState },
   { ODD_BLINKING, OFF, &switchOffAll, &loopOddBlinkingState }
@@ -111,6 +114,7 @@ const int CYLON_LEFT_START_INDEX = (NUMBER_OF_LEDS/2)-1;
 const int CYLON_RIGHT_START_INDEX = CYLON_LEFT_START_INDEX + 1;
 const int NUMBER_OF_STOPPING_BLINKS = 6;
 const int NUMBER_STATES = sizeof(STATES)/sizeof(struct state);
+const int TRAIN_SIZE = 5;
 const unsigned long BLINK_INTERVAL = 1 << 8;
 const unsigned long CYLON_BLINK_INTERVAL = (BLINK_INTERVAL >> 1) - 10;
 const unsigned long DEBOUNCE_DELAY = 50;
@@ -174,10 +178,13 @@ void switchOffAllAndResetCylonIndices() {
   cylonRightIndex = NUMBER_OF_LEDS -1;
 }
 
-void wrapAroundIncrementIndex(int& index) {
+void wrapAroundIncrementIndex(
+  int& index, 
+  const int upperBound = NUMBER_OF_LEDS,
+  const int lowerBound = 0) {
   index++;
-  if(index == NUMBER_OF_LEDS) {
-    resetIndex(index);
+  if(index == upperBound) {
+    index = lowerBound;
   }
 }
 
@@ -486,6 +493,26 @@ void loopCrossingLeds() {
     switchOff(LEDS + cylonRightIndex);
     wrapAroundDecrementIndex(cylonRightIndex);
     switchOn(LEDS + cylonRightIndex);
+  }
+}
+
+void loopRunningTrain() {
+  if(interValElapsed(HIGH_SPEED_BLINK_INTERVAL)) {
+    int index = currentOnLedIndex - TRAIN_SIZE;
+    if(0 <= index && index < NUMBER_OF_LEDS) {
+      switchOff(LEDS + index);
+    }
+    for(int onIndex = currentOnLedIndex;
+      0 <= onIndex && 
+      onIndex < NUMBER_OF_LEDS && 
+      onIndex > currentOnLedIndex - TRAIN_SIZE;
+      onIndex--) {
+      switchOn(LEDS + onIndex);
+    }
+    wrapAroundIncrementIndex(
+      currentOnLedIndex, 
+      NUMBER_OF_LEDS + TRAIN_SIZE, 
+      -TRAIN_SIZE);
   }
 }
 
