@@ -5,6 +5,7 @@ enum TRAIN_STATE {
   FILLING_UP,
   FILLING_UP_DRYING_UP,
   RANDOM_FILL,
+  CROSSING_LEDS,
   RUNNING,
   HIGH_SPEED,
   ULTRA_HIGH_SPEED,
@@ -53,6 +54,8 @@ void switchOffAllAndResetLedIndex();
 void loopFillingUp();
 void loopFillingUpDryingUp();
 void loopRandomFill();
+void loopCrossingLeds();
+void switchOffAllAndResetCylonIndices();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -60,7 +63,8 @@ const struct state STATES[] = {
   { CYLON_COMMANDER, FILLING_UP, &switchOffAllAndResetLedIndex, &loopCylonCommanderState },
   { FILLING_UP, FILLING_UP_DRYING_UP, &switchOffAllAndResetLedIndex, &loopFillingUp },
   { FILLING_UP_DRYING_UP, RANDOM_FILL, &switchOffAllAndResetLedIndex, &loopFillingUpDryingUp },
-  { RANDOM_FILL, RUNNING, &switchOffAllAndResetLedIndex, &loopRandomFill },
+  { RANDOM_FILL, CROSSING_LEDS, &switchOffAllAndResetLedIndex, &loopRandomFill },
+  { CROSSING_LEDS, RUNNING, &switchOffAllAndResetCylonIndices, &loopCrossingLeds },
   { RUNNING, HIGH_SPEED, &switchOffAllAndResetLedIndex, &loopRunningState },
   { HIGH_SPEED, ULTRA_HIGH_SPEED, 0, &loopHighSpeedRunningState },
   { ULTRA_HIGH_SPEED, STOPPING, 0, &loopUltraHighSpeedRunningState },
@@ -113,7 +117,7 @@ const unsigned long DEBOUNCE_DELAY = 50;
 const unsigned long DECELERATION_MULTIPLIER = 3;
 const unsigned long HIGH_SPEED_BLINK_INTERVAL = BLINK_INTERVAL >> 2;
 const unsigned long ULTRA_HIGH_SPEED_BLINK_INTERVAL = BLINK_INTERVAL >> 4;
-
+const unsigned long RIGHT_LED_LAG = 100;
 enum DIRECTION cylonLeftDirection = RIGHT_TO_LEFT;
 enum DIRECTION cylonRightDirection = LEFT_TO_RIGHT;
 enum DIRECTION knightRiderDirection = LEFT_TO_RIGHT;
@@ -130,8 +134,10 @@ int targetIndex = 0;
 
 struct state currentTrainState = STATES[0];
 unsigned long currentMillis = 0;
+unsigned long currentRightLedMillis = 0;
 unsigned long lastDebounceTime = 0;
 unsigned long previousMillis = 0;
+unsigned long previousRightLedMillis = 0;
 
 void switchOff(struct led *l) {
   digitalWrite(l->pin, LOW);
@@ -160,6 +166,12 @@ void resetIndex(int& index) {
 void switchOffAllAndResetLedIndex() {
   switchOffAll();
   resetIndex(currentOnLedIndex);
+}
+
+void switchOffAllAndResetCylonIndices() {
+  switchOffAll();
+  resetIndex(cylonLeftIndex);
+  cylonRightIndex = NUMBER_OF_LEDS -1;
 }
 
 void wrapAroundIncrementIndex(int& index) {
@@ -198,11 +210,18 @@ void switchOnPreviousLed(int& index) {
   switchOn(LEDS + index);
 }
 
-int interValElapsed(int interval) {
-  currentMillis = millis();
-  int returnValue = currentMillis - previousMillis > interval;
+bool interValElapsed(int interval) {
+  return interValElapsed(interval, currentMillis, previousMillis);
+}
+
+bool interValElapsed(
+  int interval, 
+  unsigned long& current, 
+  unsigned long& previous) {
+  current = millis();
+  bool returnValue = current - previous > interval;
   if (returnValue) {
-    previousMillis = currentMillis;
+    previous = current;
   }
   return returnValue;
 }
@@ -451,6 +470,22 @@ void loopRandomFill() {
       removeLed();
       safeDecrementIndex(currentOnLedIndex);
     }
+  }
+}
+
+void loopCrossingLeds() {
+  if(interValElapsed(HIGH_SPEED_BLINK_INTERVAL)) {
+    switchOff(LEDS + cylonLeftIndex);
+    wrapAroundIncrementIndex(cylonLeftIndex);
+    switchOn(LEDS + cylonLeftIndex);
+  }  
+  if(interValElapsed(
+    HIGH_SPEED_BLINK_INTERVAL + RIGHT_LED_LAG, 
+    currentRightLedMillis, 
+    previousRightLedMillis)) {
+    switchOff(LEDS + cylonRightIndex);
+    wrapAroundDecrementIndex(cylonRightIndex);
+    switchOn(LEDS + cylonRightIndex);
   }
 }
 
