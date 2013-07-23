@@ -162,29 +162,39 @@ void switchOffAllAndResetLedIndex() {
   resetIndex(currentOnLedIndex);
 }
 
-void incrementIndex(int& index) {
+void wrapAroundIncrementIndex(int& index) {
   index++;
   if(index == NUMBER_OF_LEDS) {
     resetIndex(index);
   }
 }
 
-void decrementIndex(int& index) {
+void wrapAroundDecrementIndex(int& index) {
   index--;
   if(index == -1) {
     index = NUMBER_OF_LEDS - 1;
   }
 }
 
+void safeIncrementIndex(int& index) {
+  index++;
+  index = min(index, NUMBER_OF_LEDS -1);
+}
+
+void safeDecrementIndex(int& index) {
+  index--;
+  index = max(0, index);
+}
+
 void switchOnNextLed(int& index) {
   switchOff(LEDS + index);
-  incrementIndex(index);
+  wrapAroundIncrementIndex(index);
   switchOn(LEDS + index);
 }
 
 void switchOnPreviousLed(int& index) {
   switchOff(LEDS + index);
-  decrementIndex(index);
+  wrapAroundDecrementIndex(index);
   switchOn(LEDS + index);
 }
 
@@ -435,13 +445,11 @@ void loopRandomFill() {
   if(interValElapsed(HIGH_SPEED_BLINK_INTERVAL)) {
     if(fillingDirection == LEFT_TO_RIGHT) {
       addLed();
-      currentOnLedIndex++;
-      currentOnLedIndex = min(currentOnLedIndex, NUMBER_OF_LEDS -1);
+      safeIncrementIndex(currentOnLedIndex);
     }
     if(fillingDirection == RIGHT_TO_LEFT) {
       removeLed();
-      currentOnLedIndex--;
-      currentOnLedIndex = max(0,currentOnLedIndex);
+      safeDecrementIndex(currentOnLedIndex);
     }
   }
 }
