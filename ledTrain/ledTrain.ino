@@ -19,7 +19,7 @@ enum TRAIN_STATE {
   EVEN_BLINKING,
   ODD_BLINKING,
   BINARY_COUNTER,
-  BINARY_COUNTER_GREY_CODE,
+  BINARY_COUNTER_GRAY_CODE,
   BINARY_COUNTER_FIBONACCI,
   BINARY_COUNTER_FACTORIAL,
   BINARY_RANDOM,
@@ -68,6 +68,7 @@ void loopBinaryCounterGrayCode();
 void loopBinaryCounterFibonacci();
 void loopBinaryCounterFactorial();
 void loopBinaryRandom();
+void resetAllAndResetCounter();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -88,12 +89,12 @@ const struct state STATES[] = {
   { RUNNING_TRAIN, ALL_BLINKING, &switchOffAllAndResetLedIndex, &loopRunningTrain },
   { ALL_BLINKING, EVEN_BLINKING, &switchOffAll, &loopAllBlinkingState },
   { EVEN_BLINKING, ODD_BLINKING, &switchOffAll, &loopEvenBlinkingState },
-  { ODD_BLINKING, BINARY_COUNTER, &switchOffAll, &loopOddBlinkingState },
-  { BINARY_COUNTER, BINARY_COUNTER_GREY_CODE, &switchOffAll, &loopBinaryCounter },
-  { BINARY_COUNTER_GREY_CODE, BINARY_COUNTER_FIBONACCI, &switchOffAll, &loopBinaryCounterGrayCode },
-  { BINARY_COUNTER_FIBONACCI, BINARY_COUNTER_FACTORIAL, &switchOffAll, &loopBinaryCounterFibonacci },
-  { BINARY_COUNTER_FACTORIAL, BINARY_RANDOM, &switchOffAll, &loopBinaryCounterFactorial },
-  { BINARY_RANDOM, OFF, &switchOffAll, &loopBinaryRandom },
+  { ODD_BLINKING, BINARY_COUNTER, &switchOffAllAndResetCounter, &loopOddBlinkingState },
+  { BINARY_COUNTER, BINARY_COUNTER_GRAY_CODE, &switchOffAllAndResetCounter, &loopBinaryCounter },
+  { BINARY_COUNTER_GRAY_CODE, BINARY_COUNTER_FIBONACCI, &switchOffAllAndResetCounter, &loopBinaryCounterGrayCode },
+  { BINARY_COUNTER_FIBONACCI, BINARY_COUNTER_FACTORIAL, &switchOffAllAndResetCounter, &loopBinaryCounterFibonacci },
+  { BINARY_COUNTER_FACTORIAL, BINARY_RANDOM, &switchOffAllAndResetCounter, &loopBinaryCounterFactorial },
+  { BINARY_RANDOM, OFF, &switchOffAllAndResetCounter, &loopBinaryRandom },
 };
 
 #define DIGITAL(pin) pin, false
@@ -189,6 +190,11 @@ void resetIndex(int& index) {
 void switchOffAllAndResetLedIndex() {
   switchOffAll();
   resetIndex(currentOnLedIndex);
+}
+
+void switchOffAllAndResetCounter() {
+  switchOffAll();
+  counter = 0;
 }
 
 void switchOffAllAndResetCylonIndices() {
@@ -593,11 +599,15 @@ unsigned int factorial(unsigned int n, unsigned int& factorialNMinus1) {
 
 void loopBinaryCounterFactorial() {
   if(interValElapsed(BLINK_INTERVAL)) {
+    if(counter == 0) { 
+      counter++;
+    }
     unsigned int fact = factorial(counter, factorialNMinus1);
+
     if(fact >= 1 << NUMBER_OF_LEDS) {
       fact = 1;
       factorialNMinus1 = 1;
-      counter = 0;
+      counter = 1;
     }
     setLedsCorrespondingToBits(fact);
     counter++;
