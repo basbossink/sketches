@@ -18,6 +18,10 @@ enum TRAIN_STATE {
   ALL_BLINKING,
   EVEN_BLINKING,
   ODD_BLINKING,
+  BINARY_COUNTER,
+  BINARY_COUNTER_GREY_CODE,
+  BINARY_COUNTER_FIBONACCI,
+  BINARY_COUNTER_FACTORIAL,
 }; 
 
 enum DIRECTION {
@@ -58,6 +62,10 @@ void loopRandomFill();
 void loopCrossingLeds();
 void switchOffAllAndResetCylonIndices();
 void loopRunningTrain();
+void loopBinaryCounter();
+void loopBinaryCounterGrayCode();
+void loopBinaryCounterFibonacci();
+void loopBinaryCounterFactorial();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -78,7 +86,11 @@ const struct state STATES[] = {
   { RUNNING_TRAIN, ALL_BLINKING, &switchOffAllAndResetLedIndex, &loopRunningTrain },
   { ALL_BLINKING, EVEN_BLINKING, &switchOffAll, &loopAllBlinkingState },
   { EVEN_BLINKING, ODD_BLINKING, &switchOffAll, &loopEvenBlinkingState },
-  { ODD_BLINKING, OFF, &switchOffAll, &loopOddBlinkingState }
+  { ODD_BLINKING, BINARY_COUNTER, &switchOffAll, &loopOddBlinkingState },
+  { BINARY_COUNTER, BINARY_COUNTER_GREY_CODE, &switchOffAll, &loopBinaryCounter },
+  { BINARY_COUNTER_GREY_CODE, BINARY_COUNTER_FIBONACCI, &switchOffAll, &loopBinaryCounterGrayCode },
+  { BINARY_COUNTER_FIBONACCI, BINARY_COUNTER_FACTORIAL, &switchOffAll, &loopBinaryCounterFibonacci },
+  { BINARY_COUNTER_FACTORIAL, OFF, &switchOffAll, &loopBinaryCounterFactorial },
 };
 
 #define DIGITAL(pin) pin, false
@@ -135,6 +147,10 @@ int cylonRightIndex = 0;
 int lastButtonState = 0;
 int stoppingBlinksElapsed = 0;
 int targetIndex = 0;
+unsigned int counter = 0;
+unsigned int fibNMinus2 = 0;
+unsigned int fibNMinus1 = 1;
+unsigned int factorialNMinus1 = 1;
 
 struct state currentTrainState = STATES[0];
 unsigned long currentMillis = 0;
@@ -178,8 +194,9 @@ void switchOffAllAndResetCylonIndices() {
   cylonRightIndex = NUMBER_OF_LEDS -1;
 }
 
+template <typename T>
 void wrapAroundIncrementIndex(
-  int& index, 
+  T& index, 
   const int upperBound = NUMBER_OF_LEDS,
   const int lowerBound = 0) {
   index++;
@@ -207,7 +224,7 @@ void safeDecrementIndex(int& index) {
 
 void switchOnNextLed(int& index) {
   switchOff(LEDS + index);
-  wrapAroundIncrementIndex(index);
+  wrapAroundIncrementIndex<int>(index);
   switchOn(LEDS + index);
 }
 
@@ -483,7 +500,7 @@ void loopRandomFill() {
 void loopCrossingLeds() {
   if(interValElapsed(HIGH_SPEED_BLINK_INTERVAL)) {
     switchOff(LEDS + cylonLeftIndex);
-    wrapAroundIncrementIndex(cylonLeftIndex);
+    wrapAroundIncrementIndex<int>(cylonLeftIndex);
     switchOn(LEDS + cylonLeftIndex);
   }  
   if(interValElapsed(
@@ -509,10 +526,78 @@ void loopRunningTrain() {
       onIndex--) {
       switchOn(LEDS + onIndex);
     }
-    wrapAroundIncrementIndex(
+    wrapAroundIncrementIndex<int>(
       currentOnLedIndex, 
       NUMBER_OF_LEDS + TRAIN_SIZE, 
       -TRAIN_SIZE);
+  }
+}
+
+void setLedsCorrespondingToBits(unsigned int number) {
+    for(int bit = 0; bit < NUMBER_OF_LEDS; bit++) {
+      if(bitRead(number,bit)) {
+        switchOn(LEDS + bit);
+      } else {
+        switchOff(LEDS + bit);
+      }
+    }
+}
+
+void loopBinaryCounter() {
+  if(interValElapsed(ULTRA_HIGH_SPEED_BLINK_INTERVAL)) {
+    setLedsCorrespondingToBits(counter);
+    wrapAroundIncrementIndex<unsigned int>(counter, 1 << NUMBER_OF_LEDS);
+  }
+}
+
+unsigned int binaryToGray(unsigned int number) {
+  return (number >> 1) ^ number;
+}
+
+void loopBinaryCounterGrayCode() {
+  if(interValElapsed(ULTRA_HIGH_SPEED_BLINK_INTERVAL)) {
+    unsigned int gray = binaryToGray(counter);
+    setLedsCorrespondingToBits(gray);
+    wrapAroundIncrementIndex<unsigned int>(counter, 1 << NUMBER_OF_LEDS);
+  }
+} 
+
+unsigned int fibonacci(
+  unsigned int& fibonacciNMinus2, 
+  unsigned int& fibonacciNMinus1) {
+  unsigned int returnValue = fibonacciNMinus2 + fibonacciNMinus1;
+  fibonacciNMinus2 = fibonacciNMinus1;
+  fibonacciNMinus1 = returnValue;
+  return returnValue;
+}
+
+void loopBinaryCounterFibonacci() {
+  if(interValElapsed(BLINK_INTERVAL)) {
+    setLedsCorrespondingToBits(counter);
+    counter = fibonacci(fibNMinus2, fibNMinus1);
+    if(counter >= 1 << NUMBER_OF_LEDS) {
+      fibNMinus2 = 0;
+      fibNMinus1 = 1;
+    }
+  }
+}
+
+unsigned int factorial(unsigned int n, unsigned int& factorialNMinus1) {
+  unsigned int returnValue = n * factorialNMinus1;
+  factorialNMinus1 = returnValue;
+  return returnValue;
+}
+
+void loopBinaryCounterFactorial() {
+  if(interValElapsed(BLINK_INTERVAL)) {
+    unsigned int fact = factorial(counter, factorialNMinus1);
+    if(fact >= 1 << NUMBER_OF_LEDS) {
+      fact = 1;
+      factorialNMinus1 = 1;
+      counter = 0;
+    }
+    setLedsCorrespondingToBits(fact);
+    counter++;
   }
 }
 
