@@ -22,6 +22,7 @@ enum TRAIN_STATE {
   BINARY_COUNTER_GREY_CODE,
   BINARY_COUNTER_FIBONACCI,
   BINARY_COUNTER_FACTORIAL,
+  BINARY_RANDOM,
 }; 
 
 enum DIRECTION {
@@ -66,6 +67,7 @@ void loopBinaryCounter();
 void loopBinaryCounterGrayCode();
 void loopBinaryCounterFibonacci();
 void loopBinaryCounterFactorial();
+void loopBinaryRandom();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -90,7 +92,8 @@ const struct state STATES[] = {
   { BINARY_COUNTER, BINARY_COUNTER_GREY_CODE, &switchOffAll, &loopBinaryCounter },
   { BINARY_COUNTER_GREY_CODE, BINARY_COUNTER_FIBONACCI, &switchOffAll, &loopBinaryCounterGrayCode },
   { BINARY_COUNTER_FIBONACCI, BINARY_COUNTER_FACTORIAL, &switchOffAll, &loopBinaryCounterFibonacci },
-  { BINARY_COUNTER_FACTORIAL, OFF, &switchOffAll, &loopBinaryCounterFactorial },
+  { BINARY_COUNTER_FACTORIAL, BINARY_RANDOM, &switchOffAll, &loopBinaryCounterFactorial },
+  { BINARY_RANDOM, OFF, &switchOffAll, &loopBinaryRandom },
 };
 
 #define DIGITAL(pin) pin, false
@@ -598,6 +601,12 @@ void loopBinaryCounterFactorial() {
     }
     setLedsCorrespondingToBits(fact);
     counter++;
+  }
+}
+
+void loopBinaryRandom() {
+  if(interValElapsed(BLINK_INTERVAL)) {
+    setLedsCorrespondingToBits(random((1 << NUMBER_OF_LEDS) -1));
   }
 }
 
