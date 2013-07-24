@@ -603,7 +603,6 @@ void loopBinaryCounterFactorial() {
       counter++;
     }
     unsigned int fact = factorial(counter, factorialNMinus1);
-
     if(fact >= 1 << NUMBER_OF_LEDS) {
       fact = 1;
       factorialNMinus1 = 1;
