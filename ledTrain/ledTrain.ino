@@ -15,6 +15,7 @@ enum TRAIN_STATE {
   BACKWARDS_STOPPING,
   STOPPED,
   RUNNING_TRAIN,
+  PONG,
   ALL_BLINKING,
   EVEN_BLINKING,
   ODD_BLINKING,
@@ -69,6 +70,8 @@ void loopBinaryCounterFibonacci();
 void loopBinaryCounterFactorial();
 void loopBinaryRandom();
 void resetAllAndResetCounter();
+void loopPong();
+void switchOffAllAndResetIndexAndTrainDirection();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -86,7 +89,8 @@ const struct state STATES[] = {
   { BACKWARDS, BACKWARDS_STOPPING, 0, &loopRunningBackwardState },
   { BACKWARDS_STOPPING, STOPPED,  0, &loopStoppingBackwardState },
   { STOPPED, RUNNING_TRAIN, 0, &nop },
-  { RUNNING_TRAIN, ALL_BLINKING, &switchOffAllAndResetLedIndex, &loopRunningTrain },
+  { RUNNING_TRAIN, PONG, &switchOffAllAndResetLedIndex, &loopRunningTrain },
+  { PONG, ALL_BLINKING, & switchOffAllAndResetIndexAndTrainDirection, &loopPong },
   { ALL_BLINKING, EVEN_BLINKING, &switchOffAll, &loopAllBlinkingState },
   { EVEN_BLINKING, ODD_BLINKING, &switchOffAll, &loopEvenBlinkingState },
   { ODD_BLINKING, BINARY_COUNTER, &switchOffAllAndResetCounter, &loopOddBlinkingState },
@@ -142,6 +146,7 @@ enum DIRECTION cylonLeftDirection = RIGHT_TO_LEFT;
 enum DIRECTION cylonRightDirection = LEFT_TO_RIGHT;
 enum DIRECTION knightRiderDirection = LEFT_TO_RIGHT;
 enum DIRECTION fillingDirection = LEFT_TO_RIGHT;
+enum DIRECTION trainDirection = LEFT_TO_RIGHT;
 
 int buttonPushCounter = 0;
 int buttonState = 0;
@@ -201,6 +206,12 @@ void switchOffAllAndResetCylonIndices() {
   switchOffAll();
   resetIndex(cylonLeftIndex);
   cylonRightIndex = NUMBER_OF_LEDS -1;
+}
+
+void switchOffAllAndResetIndexAndTrainDirection() {
+  switchOffAll();
+  resetIndex(currentOnLedIndex);
+  trainDirection = LEFT_TO_RIGHT;
 }
 
 template <typename T>
@@ -616,6 +627,56 @@ void loopBinaryCounterFactorial() {
 void loopBinaryRandom() {
   if(interValElapsed(BLINK_INTERVAL)) {
     setLedsCorrespondingToBits(random((1 << NUMBER_OF_LEDS) -1));
+  }
+}
+
+void switchOffTrailingLed() {
+  int index = trainDirection == LEFT_TO_RIGHT ? 
+    currentOnLedIndex - 1 : 
+    currentOnLedIndex + TRAIN_SIZE;
+  if(0 <= index && index < NUMBER_OF_LEDS) {
+    switchOff(LEDS + index);
+  }
+}
+
+void updateDirection() {
+  if(currentOnLedIndex == 0) {
+    trainDirection = LEFT_TO_RIGHT;
+  }
+  if(currentOnLedIndex == NUMBER_OF_LEDS - TRAIN_SIZE) {
+    trainDirection = RIGHT_TO_LEFT;
+  }
+}
+
+void updateIndex() {
+  if(trainDirection == LEFT_TO_RIGHT) {
+    currentOnLedIndex++;
+  }
+  if(trainDirection == RIGHT_TO_LEFT) {
+    currentOnLedIndex--;
+  }
+}
+
+void switchOnTrainLeds() {
+  for(int onIndex = currentOnLedIndex;
+    0 <= onIndex && 
+    onIndex < NUMBER_OF_LEDS &&
+    onIndex < currentOnLedIndex + TRAIN_SIZE;
+    onIndex++) {
+    switchOn(LEDS + onIndex);
+  }
+}
+
+void moveTrain() {
+  switchOffTrailingLed();
+  switchOnTrainLeds();
+}
+
+void loopPong() {
+  if(interValElapsed(HIGH_SPEED_BLINK_INTERVAL)) {
+    moveTrain();
+    updateDirection();
+    updateIndex();
   }
 }
 
