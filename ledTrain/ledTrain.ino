@@ -24,6 +24,7 @@ enum TRAIN_STATE {
   BINARY_COUNTER_FIBONACCI,
   BINARY_COUNTER_FACTORIAL,
   BINARY_RANDOM,
+  ANIMATE_PINBALL,
 }; 
 
 enum DIRECTION {
@@ -34,6 +35,11 @@ enum DIRECTION {
 struct led {
   int pin;
   bool isOn;
+};
+
+struct frame { 
+  unsigned int still;
+  int repeatCount;
 };
 
 struct state { 
@@ -72,6 +78,7 @@ void loopBinaryRandom();
 void resetAllAndResetCounter();
 void loopPong();
 void switchOffAllAndResetIndexAndTrainDirection();
+void loopAnimatePinball();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -98,7 +105,8 @@ const struct state STATES[] = {
   { BINARY_COUNTER_GRAY_CODE, BINARY_COUNTER_FIBONACCI, &switchOffAllAndResetCounter, &loopBinaryCounterGrayCode },
   { BINARY_COUNTER_FIBONACCI, BINARY_COUNTER_FACTORIAL, &switchOffAllAndResetCounter, &loopBinaryCounterFibonacci },
   { BINARY_COUNTER_FACTORIAL, BINARY_RANDOM, &switchOffAllAndResetCounter, &loopBinaryCounterFactorial },
-  { BINARY_RANDOM, OFF, &switchOffAllAndResetCounter, &loopBinaryRandom },
+  { BINARY_RANDOM, ANIMATE_PINBALL, &switchOffAllAndResetCounter, &loopBinaryRandom },
+  { ANIMATE_PINBALL, OFF, &switchOffAll, &loopAnimatePinball },
 };
 
 #define DIGITAL(pin) pin, false
@@ -128,6 +136,65 @@ struct led LEDS[] = {
 
 #undef DIGITAL
 
+#define HEX__(n) 0x##n##LU
+
+/* 8-bit conversion function */
+#define B8__(x) ((x&0x0000000FLU)?1:0) \
++((x&0x000000F0LU)?2:0) \
++((x&0x00000F00LU)?4:0) \
++((x&0x0000F000LU)?8:0) \
++((x&0x000F0000LU)?16:0) \
++((x&0x00F00000LU)?32:0) \
++((x&0x0F000000LU)?64:0) \
++((x&0xF0000000LU)?128:0)
+
+/* *** user macros *** /
+
+/* for upto 8-bit binary constants */
+#define B8(d) ((unsigned char)B8__(HEX__(d)))
+
+/* for upto 16-bit binary constants, MSB first */
+#define B16(dmsb,dlsb) (((unsigned short)B8(dmsb)<<8) \
++ B8(dlsb))
+
+#define B32(dmsb,db2,db3,dlsb) (((unsigned long)B8(dmsb)<<24) \
++ ((unsigned long)B8(db2)<<16) \
++ ((unsigned long)B8(db3)<<8) \
++ B8(dlsb))
+
+#define FRAME(image, count) { image, count },
+
+const struct frame PINBALL_ANIMATION[] = {
+  FRAME( B32(00000000,00000000,00000001,11111111), 20)
+  FRAME( B32(00000000,00000000,00000001,01111111), 5)
+  FRAME( B32(00000000,00000000,00000001,00111111), 5)
+  FRAME( B32(00000000,00000000,00000001,00011111), 5)
+  FRAME( B32(00000000,00000000,00000001,00001111), 5)
+  FRAME( B32(00000000,00000000,00000001,00000011), 5)
+  FRAME( B32(00000000,00000000,00000001,00000001), 5)
+  FRAME( B32(00000000,00000000,00000001,00000011), 1)
+  FRAME( B32(00000000,00000000,00000001,00000111), 1)
+  FRAME( B32(00000000,00000000,00000001,00001111), 1)
+  FRAME( B32(00000000,00000000,00000001,00011111), 1)
+  FRAME( B32(00000000,00000000,00000001,00111111), 1)
+  FRAME( B32(00000000,00000000,00000001,01111111), 1)
+  FRAME( B32(00000000,00000000,00000001,11111111), 1)
+  FRAME( B32(00000000,00000000,00000010,01111111), 1)
+  FRAME( B32(00000000,00000000,00000100,00111111), 1)
+  FRAME( B32(00000000,00000000,00001000,01111111), 1)
+  FRAME( B32(00000000,00000000,00010000,11111111), 1)
+  FRAME( B32(00000000,00000000,00100000,11111111), 1)
+  FRAME( B32(00000000,00000000,01000000,11111111), 1)
+  FRAME( B32(00000000,00000000,10000000,11111111), 1)
+  FRAME( B32(00000000,00000001,00000000,11111111), 1)
+  FRAME( B32(00000000,00000010,00000000,11111111), 1)
+  FRAME( B32(00000000,00000100,00000000,11111111), 1)
+  FRAME( B32(00000000,00001000,00000000,11111111), 1)
+  FRAME( B32(00000000,00010000,00000000,11111111), 1)
+};
+
+#undef FRAME
+
 const int BUTTON_PIN = 2;
 const int NUMBER_OF_LEDS = sizeof(LEDS)/sizeof(struct led);
 const int CYLON_LEFT_START_INDEX = (NUMBER_OF_LEDS/2)-1;
@@ -135,6 +202,7 @@ const int CYLON_RIGHT_START_INDEX = CYLON_LEFT_START_INDEX + 1;
 const int NUMBER_OF_STOPPING_BLINKS = 6;
 const int NUMBER_STATES = sizeof(STATES)/sizeof(struct state);
 const int TRAIN_SIZE = 5;
+const int NUMBER_OF_PINBALL_FRAMES = sizeof(PINBALL_ANIMATION)/sizeof(struct frame);
 const unsigned long BLINK_INTERVAL = 1 << 8;
 const unsigned long CYLON_BLINK_INTERVAL = (BLINK_INTERVAL >> 1) - 10;
 const unsigned long DEBOUNCE_DELAY = 50;
@@ -142,6 +210,7 @@ const unsigned long DECELERATION_MULTIPLIER = 3;
 const unsigned long HIGH_SPEED_BLINK_INTERVAL = BLINK_INTERVAL >> 2;
 const unsigned long ULTRA_HIGH_SPEED_BLINK_INTERVAL = BLINK_INTERVAL >> 4;
 const unsigned long RIGHT_LED_LAG = 100;
+const unsigned long FRAME_UPDATE_INTERVAL = 40;
 enum DIRECTION cylonLeftDirection = RIGHT_TO_LEFT;
 enum DIRECTION cylonRightDirection = LEFT_TO_RIGHT;
 enum DIRECTION knightRiderDirection = LEFT_TO_RIGHT;
@@ -156,6 +225,7 @@ int cylonRightIndex = 0;
 int lastButtonState = 0;
 int stoppingBlinksElapsed = 0;
 int targetIndex = 0;
+int frameCounter = 0;
 unsigned int counter = 0;
 unsigned int fibNMinus2 = 0;
 unsigned int fibNMinus1 = 1;
@@ -677,6 +747,15 @@ void loopPong() {
     moveTrain();
     updateDirection();
     updateIndex();
+  }
+}
+
+void loopAnimatePinball() {
+  int previousFrame = frameCounter == 0 ? 
+    NUMBER_OF_PINBALL_FRAMES - 1 : frameCounter -1; 
+  if(interValElapsed(FRAME_UPDATE_INTERVAL * (PINBALL_ANIMATION[previousFrame].repeatCount))) {
+    setLedsCorrespondingToBits(PINBALL_ANIMATION[frameCounter].still);
+    wrapAroundIncrementIndex(frameCounter, NUMBER_OF_PINBALL_FRAMES);
   }
 }
 
