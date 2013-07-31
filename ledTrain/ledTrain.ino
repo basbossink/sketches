@@ -25,6 +25,7 @@ enum TRAIN_STATE {
   BINARY_COUNTER_FACTORIAL,
   BINARY_RANDOM,
   ANIMATE_PINBALL,
+  ANIMATE_BOUNCING_BALLS,
 }; 
 
 enum DIRECTION {
@@ -79,6 +80,7 @@ void resetAllAndResetCounter();
 void loopPong();
 void switchOffAllAndResetIndexAndTrainDirection();
 void loopAnimatePinball();
+void loopAnimateBouncingBalls();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -106,7 +108,8 @@ const struct state STATES[] = {
   { BINARY_COUNTER_FIBONACCI, BINARY_COUNTER_FACTORIAL, &switchOffAllAndResetCounter, &loopBinaryCounterFibonacci },
   { BINARY_COUNTER_FACTORIAL, BINARY_RANDOM, &switchOffAllAndResetCounter, &loopBinaryCounterFactorial },
   { BINARY_RANDOM, ANIMATE_PINBALL, &switchOffAllAndResetCounter, &loopBinaryRandom },
-  { ANIMATE_PINBALL, OFF, &switchOffAll, &loopAnimatePinball },
+  { ANIMATE_PINBALL, ANIMATE_BOUNCING_BALLS, &switchOffAll, &loopAnimatePinball },
+  { ANIMATE_BOUNCING_BALLS, OFF, &switchOffAll, &loopAnimateBouncingBalls },
 };
 
 #define DIGITAL(pin) pin, false
@@ -193,6 +196,25 @@ const struct frame PINBALL_ANIMATION[] = {
   FRAME( B32(00000000,00010000,00000000,11111111), 1)
 };
 
+const struct frame BOUNCING_BALLS_ANIMATION[] = {
+  FRAME( B32(00000000,00001000,01111000,00000000), 10)
+  FRAME( B32(00000000,00000100,01111000,00000000), 5)
+  FRAME( B32(00000000,00000010,01111000,00000000), 3)
+  FRAME( B32(00000000,00000001,01111000,00000000), 2)
+  FRAME( B32(00000000,00000000,11111000,00000000), 1)
+  FRAME( B32(00000000,00000000,11110100,00000000), 2)
+  FRAME( B32(00000000,00000000,11110010,00000000), 3)
+  FRAME( B32(00000000,00000000,11110001,00000000), 5)
+  FRAME( B32(00000000,00000000,11110000,10000000), 10)
+  FRAME( B32(00000000,00000000,11110001,00000000), 5)
+  FRAME( B32(00000000,00000000,11110010,00000000), 3)
+  FRAME( B32(00000000,00000000,11110100,00000000), 2)
+  FRAME( B32(00000000,00000000,11111000,00000000), 1)
+  FRAME( B32(00000000,00000001,01111000,00000000), 2)
+  FRAME( B32(00000000,00000010,01111000,00000000), 3)
+  FRAME( B32(00000000,00000100,01111000,00000000), 5)
+};
+
 #undef FRAME
 
 const int BUTTON_PIN = 2;
@@ -203,6 +225,8 @@ const int NUMBER_OF_STOPPING_BLINKS = 6;
 const int NUMBER_STATES = sizeof(STATES)/sizeof(struct state);
 const int TRAIN_SIZE = 5;
 const int NUMBER_OF_PINBALL_FRAMES = sizeof(PINBALL_ANIMATION)/sizeof(struct frame);
+const int NUMBER_OF_BOUNCING_BALLS_FRAMES = \
+  sizeof(BOUNCING_BALLS_ANIMATION)/sizeof(struct frame);
 const unsigned long BLINK_INTERVAL = 1 << 8;
 const unsigned long CYLON_BLINK_INTERVAL = (BLINK_INTERVAL >> 1) - 10;
 const unsigned long DEBOUNCE_DELAY = 50;
@@ -750,15 +774,28 @@ void loopPong() {
   }
 }
 
-void loopAnimatePinball() {
-  int previousFrame = frameCounter == 0 ? 
-    NUMBER_OF_PINBALL_FRAMES - 1 : frameCounter -1; 
-  if(interValElapsed(FRAME_UPDATE_INTERVAL * (PINBALL_ANIMATION[previousFrame].repeatCount))) {
-    setLedsCorrespondingToBits(PINBALL_ANIMATION[frameCounter].still);
-    wrapAroundIncrementIndex(frameCounter, NUMBER_OF_PINBALL_FRAMES);
+void loopAnimation(const struct frame animation[], int& frameIndex, int numberOfFrames) {
+  int previousFrame = frameIndex == 0 ? 
+    numberOfFrames - 1 : frameIndex -1; 
+  if(interValElapsed(FRAME_UPDATE_INTERVAL * (animation[previousFrame].repeatCount))) {
+    setLedsCorrespondingToBits(animation[frameIndex].still);
+    wrapAroundIncrementIndex(frameIndex, numberOfFrames);
   }
 }
 
+void loopAnimatePinball() {
+  loopAnimation(
+  PINBALL_ANIMATION, 
+  frameCounter,
+  NUMBER_OF_PINBALL_FRAMES);
+}
+
+void loopAnimateBouncingBalls() {
+  loopAnimation(
+    BOUNCING_BALLS_ANIMATION, 
+    frameCounter, 
+    NUMBER_OF_BOUNCING_BALLS_FRAMES);
+}
 struct state nextState(struct state currentState) {
   for(int i = 0; i < NUMBER_STATES; i++) {
     if(currentState.state == STATES[i].state) {
