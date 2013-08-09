@@ -26,6 +26,7 @@ enum TRAIN_STATE {
   BINARY_RANDOM,
   ANIMATE_PINBALL,
   ANIMATE_BOUNCING_BALLS,
+  ANIMATE_CRASHING_CARS
 }; 
 
 enum DIRECTION {
@@ -81,6 +82,7 @@ void loopPong();
 void switchOffAllAndResetIndexAndTrainDirection();
 void loopAnimatePinball();
 void loopAnimateBouncingBalls();
+void loopAnimateCrashingCars();
 
 const struct state STATES[] = {
   { OFF, KNIGHT_RIDER, &switchOffAll, &nop },
@@ -109,7 +111,8 @@ const struct state STATES[] = {
   { BINARY_COUNTER_FACTORIAL, BINARY_RANDOM, &switchOffAllAndResetCounter, &loopBinaryCounterFactorial },
   { BINARY_RANDOM, ANIMATE_PINBALL, &switchOffAllAndResetCounter, &loopBinaryRandom },
   { ANIMATE_PINBALL, ANIMATE_BOUNCING_BALLS, &switchOffAll, &loopAnimatePinball },
-  { ANIMATE_BOUNCING_BALLS, OFF, &switchOffAll, &loopAnimateBouncingBalls },
+  { ANIMATE_BOUNCING_BALLS, ANIMATE_CRASHING_CARS, &switchOffAll, &loopAnimateBouncingBalls },
+  { ANIMATE_CRASHING_CARS, OFF, &switchOffAll, &loopAnimateCrashingCars },
 };
 
 #define DIGITAL(pin) pin, false
@@ -215,6 +218,24 @@ const struct frame BOUNCING_BALLS_ANIMATION[] = {
   FRAME( B32(00000000,00000100,01111000,00000000), 5)
 };
 
+const struct frame CAR_CRASH[] {
+  FRAME( B32(00000000,00011100,00000000,00000111), 3)
+  FRAME( B32(00000000,00011110,00000000,00001111), 3)
+  FRAME( B32(00000000,00001111,00000000,00011110), 3)
+  FRAME( B32(00000000,00000111,10000000,00111100), 3)
+  FRAME( B32(00000000,00000011,11000000,01111000), 3)
+  FRAME( B32(00000000,00000001,11100000,11110000), 3)
+  FRAME( B32(00000000,00000000,11110001,11100000), 3)
+  FRAME( B32(00000000,00000000,01111011,11000000), 3)
+  FRAME( B32(00000000,00000000,00111111,10000000), 3)
+  FRAME( B32(00000000,00000000,10111110,11000000), 1)
+  FRAME( B32(00000000,00000001,00111110,01100000), 1)
+  FRAME( B32(00000000,00000010,00111110,00110000), 1)
+  FRAME( B32(00000000,00000100,00111110,00011000), 1)
+  FRAME( B32(00000000,00001000,00111110,00001100), 10)
+  FRAME( B32(00000000,00010000,00111110,00000110), 10)
+};
+
 #undef FRAME
 
 const int BUTTON_PIN = 2;
@@ -227,6 +248,8 @@ const int TRAIN_SIZE = 5;
 const int NUMBER_OF_PINBALL_FRAMES = sizeof(PINBALL_ANIMATION)/sizeof(struct frame);
 const int NUMBER_OF_BOUNCING_BALLS_FRAMES = \
   sizeof(BOUNCING_BALLS_ANIMATION)/sizeof(struct frame);
+const int NUMBER_OF_CAR_CRASH_FRAMES = \
+  sizeof(CAR_CRASH) / sizeof(frame);
 const unsigned long BLINK_INTERVAL = 1 << 8;
 const unsigned long CYLON_BLINK_INTERVAL = (BLINK_INTERVAL >> 1) - 10;
 const unsigned long DEBOUNCE_DELAY = 50;
@@ -796,6 +819,14 @@ void loopAnimateBouncingBalls() {
     frameCounter, 
     NUMBER_OF_BOUNCING_BALLS_FRAMES);
 }
+
+void loopAnimateCrashingCars () {
+  loopAnimation(
+    CAR_CRASH, 
+    frameCounter, 
+    NUMBER_OF_CAR_CRASH_FRAMES);
+}
+
 struct state nextState(struct state currentState) {
   for(int i = 0; i < NUMBER_STATES; i++) {
     if(currentState.state == STATES[i].state) {
